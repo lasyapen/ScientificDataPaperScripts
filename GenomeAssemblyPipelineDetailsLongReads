@@ -1,0 +1,323 @@
+1. Guppy
+
+guppy_basecaller –i./fast5_pass –s./guppy_out –c dna_r9.4.1_450bps_hac.cfg --num_callers 2 --cpu_threads_per_caller 1
+
+Assembly and gene calling parameters:
+
+1. Flye
+
+flye --nano-raw ../Cmel.fastq -o Cmel_flye -g 9 m
+
+2. PolyPolish
+
+bwa index polished_1.fasta
+
+bwa mem -t 16 -a polished_1.fasta SRR793561_1.fastq.gz > alignments_1.sam
+
+bwa mem -t 16 -a polished_1.fasta SRR793561_2.fastq.gz > alignments_2.sam
+
+polypolish_insert_filter.py --in1 alignments_1.sam --in2 alignments_2.sam --out1 filtered_1.sam --out2 filtered_2.sam
+
+polypolish polished_1.fasta filtered_1.sam filtered_2.sam > polished_2.fasta
+
+3. AGAT: agat_sq_reverse_complement.pl (for reorienting annotations)
+
+agat_sq_reverse_complement.pl --gff Cmel_annotations_Chr4_Chr6.gff3 --fasta Cmel_genome.fasta -o Cmel_annotations_reoriented.gff3
+
+4. GenomeTools (for validating after reorienting chromosomes)
+
+gt gff3validator Cmel_annotations_reoriented.gff3
+
+5. BLASTx
+
+blastx -query Cmel_genome.fasta -db nr -out results_blastx.txt -outfmt 6 -evalue 1e-5 -num_threads 4
+
+6. FCS-GX
+
+python $EBROOTNCBIMINFCS/fcs.py screen genome --fasta Cmel_genome.fasta --out-dir./fcs_gx_out/ --gx-db “$GXDB_LOC/gxdb” --tax-id 93969
+
+7. FindTelomeres.py (on the reads)
+
+https://github.com/JanaSperschneider/FindTelomeres
+
+python FindTelomeres_Crypto_Repeat.py Cmel_pool.fasta
+
+8. Minimap2
+
+minimap2 -a --secondary = no Cmel_genome.fasta reads_with_telomeres.fastq > telomere_map.sam
+
+9. GenomeTools (for statistics)
+
+gt stat Cmel.gff3
+
+10. AGAT: agat_sq_stat_basic.pl and agat_sp_statistics.pl (for statistics)
+
+agat_sq_stat_basic.pl -i Cmel.gff3
+
+agat_sp_statistics.pl -gff Cmel.gff3
+
+11. AUGUSTUS
+
+perl ~/Augustus/scripts/autoAugTrain.pl --cpus=10 --trainingset=CryptoDB-64_CparvumIOWA-ATCC_AnnotatedProteins.fasta --species=trained_species -g=genome.fa --workingdir=./autoAug --optrounds = 1
+
+augustus --gff3=on --stopCodonExcludedFromCDS=false --species=trained_species–softmasking=0–AUGUSTUS_CONFIG_PATH=./augustus/config --strand=both–genemodel=partial Cmel_genome.fasta>augustus.gff
+
+12. Liftoff
+
+liftoff -g CpBGF.gff3 -o bgf -infer_genes -infer_transcripts -polish Cmel_genome.fasta bgf.fa
+
+13. Blastp in CryptoDB (default)
+
+https://cryptodb.org/cryptodb/app/workspace/blast/new
+
+Expectation value: 10; Max Target Sequences: 100; Max matches in query range: 0; Word Size: 6; Scoring Matrix: BLOSUM62; Gap Costs (Open/Extension): 11,1; Compositional adjustments: Conditional compositional score matrix adjustment Low complexity regions: no filter; Mask for lookup table: false; Mask lower case letters: false
+
+14. Barrnap
+
+barrnap --kingdom euk –outseq Cmel_barrnap.fasta --evalue 1e-06 --lencutoff 0.8 Cmel_genome.fasta
+
+15. TRNAscan
+
+tRNAscan-SE Cmel_genome.fasta
+
+16. Blast2GO
+
+Installed Blast2GO locally
+
+Parameters: BLASTp, the nr database, word size 5, and e-value 1e-5
+
+17. InterPro (online website used – default)
+
+https://www.ebi.ac.uk/interpro/
+
+All Member databases selected
+
+Comparative genomics parameters:
+
+1. OrthoFinder in Anaconda (raw figure in technical validation):
+
+source activate /orthology_analysis/env-ortho
+
+conda install -c bioconda diamond
+
+conda install orthofinder
+
+orthofinder -f FASTAS
+
+2. Blastp NCBI (default):
+
+https://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE=Proteins
+
+Database: nr; Max target sequences = 100; Short queries (checked); Expect threshold: 0.05; Word size = 5; Max matches in a query range: 0; Matrix BLOSUM62; Gap Costs: Existence: 11 Extension: 1; Compositional adjustments: Conditional compositional score matrix adjustment
+
+3. Blastp CryptoDB (default):
+
+https://cryptodb.org/cryptodb/app/workspace/blast/new
+
+Expectation value: 10; Max Target Sequences: 100; Max matches in query range: 0; Word Size: 6; Scoring Matrix: BLOSUM62; Gap Costs (Open/Extension): 11,1; Compositional adjustments: Conditional compositional score matrix adjustment Low complexity regions: no filter; Mask for lookup table: false; Mask lower case letters: false
+
+4. Circos:
+
+circos -conf config_file.conf
+
+5. ChrLen file for Circos (CmTU1867 contigs indicated by “1–8” and CpBGF contigs indicated by “9–16”):
+
+1880501
+
+2980476
+
+31087121
+
+41105563
+
+51085659
+
+61311173
+
+71306104
+
+81365597
+
+9919856
+
+10992060
+
+111102418
+
+121107426
+
+131085856
+
+141308482
+
+151363666
+
+161379419
+
+6. TBTools:
+
+“Advanced Circos” selected; ChrLen File created manually, Links File generated manually; rRNA features added in “Set Input Genome Feature List” option; Gene density: “Sequence Toolkits” - > “GFF3/GTF Manipulate” - > “Gene Density Profile”, Input File: Cmel.gff3, Output File: CmelGeneDensity.profile (repeat for CpBGF); GC content: “Sequence Toolkits” - > “Fasta Tools” - > “Fasta Window Stat”, Input Genome Sequence File: Cmel_genome.fasta, Output file Prefix: Cmel_genome.genome.Window.Stat
+
+7. Jupiterplot:
+
+jupiter name = $prefix ref = $reference fa = $scaffolds
+
+Technical validation parameters:
+
+1. BUSCO:
+
+busco -i < genome.fasta > -l./apicomplexa_odb10 -o BUSCO_CM.txt -m genome
+
+2. OrthoFinder in Anaconda (see above)
+
+Formatting OrthoFinder Result for OrthoVenn3’s ClusterVenn:
+
+awk -F’: ‘ ‘{for (i = 2; i<= NF; i++) if ($i!~ /^OG/) printf “%s%s”, sep, $i; sep=“\n”}’
+
+Orthogroups.txt | tr -d ‘:’ |
+
+awk ‘{
+
+for (i = 1; i < = NF; i + + ) {
+
+if ($i ~ /^CmeUKMEL1/)
+
+$i = “CryptoDB-55_CmeleagridisUKMEL1_AnnotatedProteins|” $i;
+
+else if ($i ~ /^cmbei/)
+
+$i = “CmBEI_proteins_file|” $i;
+
+else if ($i ~ /^cpbgf/)
+
+$i = “CpBGF_protein_file|” $i;
+
+}
+
+print
+
+}’ |
+
+awk ‘{
+
+for (i = 1; i < = NF; i + + ) {
+
+if ($i ~ /^CmBEI/) {
+
+cmbei = cmbei $i “ ”
+
+} else if ($i ~ /^CpBGF/) {
+
+cpbgf = cpbgf $i “ ”
+
+} else if ($i ~ /^Crypto/) {
+
+crypto = crypto $i “ ”
+
+}
+
+}
+
+print cmbei cpbgf crypto
+
+cmbei = “”
+
+cpbgf = “”
+
+crypto = “”
+
+}’ > Orthogroups2.txt
+
+Configuration File:
+
+#Add this to run circos faster
+
+#alias circos = …
+
+#Append this line to the ~/.bashrc to load when starting a new session
+
+# Chromosome name, size, and color definition
+
+karyotype = ChromosomeContigLabels.txt
+
+<ideogram> <spacing> default = 0.005r < /spacing > radius = 0.50r
+
+thickness = 20p
+
+fill = yes
+
+stroke_color = dgrey
+
+stroke_thickness = 2p
+
+show_label = yes
+
+#see etc/fonts.conf for list of font names
+
+label_font = default
+
+label_radius = 1r + 75p
+
+label_size = 60
+
+label_parallel = no < /ideogram > show_ticks = yes
+
+show_tick_labels = yes < ticks > radius = 1r + 10p
+
+color = black
+
+thickness = 3p
+
+# the tick label is derived by multiplying the tick position
+
+# by ‘multiplier’ and casting it in ‘format’:#
+
+# sprintf(format,position*multiplier)#
+
+multiplier = 1e-6
+
+# %d - integer
+
+# %f - float
+
+# %.1 f - float with one decimal
+
+# %.2 f - float with two decimals#
+
+# for other formats, see http://perldoc.perl.org/functions/sprintf.html
+
+format = %d< tick >spacing=70000 u
+
+size = 50p< /tick ># < tick >#spacing = 25000 u
+
+#size = 15p
+
+#show_label = yes
+
+#label_size = 20p
+
+#label_offset = 10p
+
+#format = %d
+
+# < /tick >< /ticks >########### NEW< links >< link >file = Links.txt
+
+#color = black_a5
+
+radius = 0.95r
+
+bezier_radius = 0.1r
+
+thickness = 15
+
+ribbon = yes< /link >< /links >##########
+
+ < image ># Included from Circos distribution.<< include etc/image.conf >>#To modify the size of the output image, default is 1500
+
+#radius* = 3000p< /image>
+
+<<include etc/colors_fonts_patterns.conf>>
+
+<<include etc/housekeeping.conf>>
+
+
